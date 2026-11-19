@@ -1,0 +1,25 @@
+server:
+  port: ${SERVER_PORT:8091}
+
+spring:
+  application:
+    name: dts-learning-intelligence
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:dts_learning_intelligence} # Đổi thành tên DB chứa 6 bảng của bạn
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:khoi0000}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+dts:
+  practice:
+    mock-enabled: true
