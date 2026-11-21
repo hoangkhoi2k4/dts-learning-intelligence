@@ -108,6 +108,45 @@ public class StudyPlanOrchestrationService {
         return new StartSessionResponse(practiceRes.sessionId(), "STARTED", false, items);
     }
 
+    @Transactional
+    public StudyPlanSkipResponse skipPlan(UUID userId, UUID planId) {
+        StudyPlan plan = planRepo.findById(planId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy kế hoạch học: " + planId));
+
+        // Bảo mật: Đảm bảo user chỉ được bỏ qua kế hoạch của chính mình (Mục 10.3)
+        if (!plan.getUserId().equals(userId)) {
+                throw new SecurityException("Bạn không có quyền thao tác trên kế hoạch này.");
+        }
+
+        // Chỉ cho phép bỏ qua khi kế hoạch đang được đề xuất hoặc đang làm dở
+        if ("COMPLETED".equals(plan.getStatus())) {
+                throw new IllegalStateException("Kế hoạch đã hoàn thành, không thể bỏ qua.");
+        }
+        if ("SKIPPED".equals(plan.getStatus())) {
+                return new StudyPlanSkipResponse(plan.getId(), plan.getStatus(), "Kế hoạch đã được bỏ qua trước đó.");
+        }
+
+        plan.setStatus("SKIPPED");
+        planRepo.save(plan);
+
+        // Nếu đã lỡ tạo phiên snapshot (đang IN_PROGRESS) thì đánh dấu ABANDONED để dọn dẹp
+        snapshotRepo.findByStudyPlanId(planId).ifPresent(snapshot -> {
+                if ("STARTED".equals(snapshot.getStatus())) {
+                snapshot.setStatus("ABANDONED");
+                snapshotRepo.save(snapshot);
+                }
+        });
+
+        // Quy tắc NT-11: Không cộng lỗi sai, không cập nhật giảm điểm LearnerSkillProfile
+        return new StudyPlanSkipResponse(
+                plan.getId(),
+                "SKIPPED",
+                "Đã bỏ qua kế hoạch học. Hệ thống không tính lỗi sai và sẽ đề xuất lộ trình mới phù hợp hơn."
+        );
+        }
+
+    public record StudyPlanSkipResponse(UUID planId, String status, String message) {}
+
     public record StudyPlanResponse(UUID planId, String status, int totalQuestions, int estimatedMinutes,
                                     List<String> focusSkills, String reason,
                                     List<AdaptiveRecommendationService.RecommendedQuestionItem> questions) {}

@@ -88,5 +88,12 @@ public class LearningIntelligenceController {
         return ResponseEntity.ok(Map.of("status", "PROCESSED", "eventId", event.getEventId()));
     }
 
+    @PostMapping("/me/plans/{planId}/skip")
+    public ResponseEntity<?> skipPlan(
+            @RequestHeader("X-User-Id") UUID userId,
+            @PathVariable UUID planId) {
+        return ResponseEntity.ok(planService.skipPlan(userId, planId));
+    }
+
     public record CreatePlanRequest(String licenseClass, Integer targetQuestionCount) {}
 }

@@ -22,6 +22,8 @@ public interface LearningEvidenceRepository extends JpaRepository<LearningEviden
 
     Optional<LearningEvidence> findBySourceOutcomeKey(String sourceOutcomeKey);
 
+    long countBySessionId(UUID sessionId);
+
     long countByUserIdAndLicenseClassAndBankVersionAndPracticeQuestionId(
             UUID userId, String licenseClass, String bankVersion, Integer practiceQuestionId);
 

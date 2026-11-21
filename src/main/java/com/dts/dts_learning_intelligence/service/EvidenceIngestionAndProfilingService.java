@@ -1,12 +1,16 @@
 package com.dts.dts_learning_intelligence.service;
 
 import com.dts.dts_learning_intelligence.dto.LearningEventDto;
+import com.dts.dts_learning_intelligence.entity.AdaptiveSessionSnapshot;
 import com.dts.dts_learning_intelligence.entity.LearnerSkillProfile;
 import com.dts.dts_learning_intelligence.entity.LearningEvidence;
 import com.dts.dts_learning_intelligence.entity.QuestionSkillMapping;
+import com.dts.dts_learning_intelligence.entity.StudyPlan;
+import com.dts.dts_learning_intelligence.repository.AdaptiveSessionSnapshotRepository;
 import com.dts.dts_learning_intelligence.repository.LearnerSkillProfileRepository;
 import com.dts.dts_learning_intelligence.repository.LearningEvidenceRepository;
 import com.dts.dts_learning_intelligence.repository.QuestionSkillMappingRepository;
+import com.dts.dts_learning_intelligence.repository.StudyPlanRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +28,8 @@ public class EvidenceIngestionAndProfilingService {
     private final LearningEvidenceRepository evidenceRepo;
     private final QuestionSkillMappingRepository mappingRepo;
     private final LearnerSkillProfileRepository profileRepo;
+    private final AdaptiveSessionSnapshotRepository snapshotRepo;
+    private final StudyPlanRepository planRepo;
 
     // Hằng số làm mượt Bayes (Mục 9.2)
     private static final double ALPHA = 2.0;
@@ -100,21 +106,48 @@ public class EvidenceIngestionAndProfilingService {
                 .build();
         evidenceRepo.save(evidence);
 
-        // Quy tắc HS-04: UNANSWERED không đánh giá sai kiến thức -> dừng tại đây, không trừ điểm Bayes
-        if ("UNANSWERED".equals(event.getOutcome())) {
-            return;
+        // 5. Cập nhật Bayes nếu câu hỏi đã được trả lời (không phải UNANSWERED - Quy tắc HS-04, HS-03)
+        if (!"UNANSWERED".equals(event.getOutcome())) {
+            recalculateSkillProfile(
+                    event.getUserId(),
+                    event.getLicenseClass(),
+                    event.getBankVersion(),
+                    mapping.getTaxonomyVersion(),
+                    mapping.getPrimarySkillCode(),
+                    "CORRECT".equals(event.getOutcome()),
+                    event.getOccurredAt()
+            );
         }
 
-        // 5. Cập nhật Hồ sơ năng lực cho kỹ năng CHÍNH (PRIMARY - Quy tắc HS-03)
-        recalculateSkillProfile(
-                event.getUserId(),
-                event.getLicenseClass(),
-                event.getBankVersion(),
-                mapping.getTaxonomyVersion(),
-                mapping.getPrimarySkillCode(),
-                "CORRECT".equals(event.getOutcome()),
-                event.getOccurredAt()
-        );
+        // 6. [MỚI] Kiểm tra và tự động chốt hoàn thành StudyPlan nếu event thuộc phiên ôn AI
+        if (event.getSessionId() != null) {
+            checkAndCompleteAdaptiveSession(event.getSessionId(), event.getOccurredAt());
+        }
+    }
+
+    private void checkAndCompleteAdaptiveSession(UUID practiceSessionId, OffsetDateTime completedAt) {
+        snapshotRepo.findByPracticeSessionId(practiceSessionId).ifPresent(snapshot -> {
+            // Nếu phiên đã COMPLETED trước đó rồi thì bỏ qua (Idempotent - Quy tắc NT-07)
+            if ("COMPLETED".equals(snapshot.getStatus())) {
+                return;
+            }
+
+            StudyPlan plan = planRepo.findById(snapshot.getStudyPlanId()).orElse(null);
+            if (plan == null) return;
+
+            // Đếm tổng số câu đã nhận được kết quả từ dts-practice cho phiên này (bao gồm cả câu UNANSWERED)
+            long recordedItemsCount = evidenceRepo.countBySessionId(practiceSessionId);
+
+            // Khi số câu nhận về đủ số lượng câu của kế hoạch -> Chốt COMPLETED
+            if (recordedItemsCount >= plan.getTargetQuestionCount()) {
+                snapshot.setStatus("COMPLETED");
+                snapshot.setCompletedAt(completedAt != null ? completedAt : OffsetDateTime.now());
+                snapshotRepo.save(snapshot);
+
+                plan.setStatus("COMPLETED");
+                planRepo.save(plan);
+            }
+        });
     }
 
     private void recalculateSkillProfile(UUID userId, String licenseClass, String bankVersion,
