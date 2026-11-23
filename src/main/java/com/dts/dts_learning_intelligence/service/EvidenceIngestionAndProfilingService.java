@@ -12,6 +12,7 @@ import com.dts.dts_learning_intelligence.repository.LearningEvidenceRepository;
 import com.dts.dts_learning_intelligence.repository.QuestionSkillMappingRepository;
 import com.dts.dts_learning_intelligence.repository.StudyPlanRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EvidenceIngestionAndProfilingService {
@@ -35,6 +37,7 @@ public class EvidenceIngestionAndProfilingService {
     private static final double ALPHA = 2.0;
     private static final double BETA = 2.0;
     private static final String ALGO_VERSION = "bayes-v1.0";
+    private static final String DEFAULT_TAXONOMY_VERSION = "tax-v1.0";
 
     @Transactional
     public void processLearningEvent(LearningEventDto event) {
@@ -52,7 +55,7 @@ public class EvidenceIngestionAndProfilingService {
                     : UUID.randomUUID().toString());
         }
         if (event.getBankVersion() == null || event.getBankVersion().isBlank()) {
-            event.setBankVersion("2025.1");
+            event.setBankVersion("dts-2026-600-v1");
         }
         if (event.getActivityType() == null || event.getActivityType().isBlank()) {
             event.setActivityType("PRACTICE_CHAPTER");
@@ -71,15 +74,24 @@ public class EvidenceIngestionAndProfilingService {
         }
 
         // 2. Đối chiếu mapping câu hỏi đã công bố (Quy tắc HS-05)
-        Optional<QuestionSkillMapping> mappingOpt = mappingRepo
-                .findByBankVersionAndPracticeQuestionIdAndStatus(
-                        event.getBankVersion(), event.getPracticeQuestionId(), "PUBLISHED");
+        // Ưu tiên tìm theo contentBuilderQuestionId (UUID chuẩn), nếu không có mới fallback sang practiceQuestionId
+        QuestionSkillMapping mapping = null;
+        if (event.getContentBuilderQuestionId() != null) {
+            mapping = mappingRepo.findByBankVersionAndTaxonomyVersionAndContentBuilderQuestionId(
+                    event.getBankVersion(), DEFAULT_TAXONOMY_VERSION, event.getContentBuilderQuestionId()
+            ).orElse(null);
+        }
+        if (mapping == null && event.getPracticeQuestionId() != null) {
+            mapping = mappingRepo.findByBankVersionAndTaxonomyVersionAndPracticeQuestionId(
+                    event.getBankVersion(), DEFAULT_TAXONOMY_VERSION, event.getPracticeQuestionId()
+            ).orElse(null);
+        }
 
-        if (mappingOpt.isEmpty()) {
-            // Không dùng dữ liệu chưa đối soát để nâng mức chắc chắn hồ sơ
+        if (mapping == null) {
+            log.warn("Không tìm thấy mapping cho câu hỏi practiceId={}, cbId={}, bankVersion={}",
+                    event.getPracticeQuestionId(), event.getContentBuilderQuestionId(), event.getBankVersion());
             return;
         }
-        QuestionSkillMapping mapping = mappingOpt.get();
 
         // 3. Tính số lần user đã gặp câu hỏi này để giảm trọng số (Quy tắc HS-02)
         long previousAttempts = evidenceRepo.countByUserIdAndLicenseClassAndBankVersionAndPracticeQuestionId(

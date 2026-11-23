@@ -68,7 +68,7 @@ public class FlowIntegrationTest {
                 .eventId(UUID.randomUUID())
                 .userId(testUserId)
                 .licenseClass(licenseClass)
-                .bankVersion("2025.1")
+                .bankVersion("dts-2026-600-v1")
                 .activityType("ADAPTIVE_PRACTICE")
                 .sessionId(practiceSessionId)
                 .practiceQuestionId(q1.practiceQuestionId())
@@ -86,7 +86,7 @@ public class FlowIntegrationTest {
                 .eventId(UUID.randomUUID())
                 .userId(testUserId)
                 .licenseClass(licenseClass)
-                .bankVersion("2025.1")
+                .bankVersion("dts-2026-600-v1")
                 .activityType("ADAPTIVE_PRACTICE")
                 .sessionId(practiceSessionId)
                 .practiceQuestionId(q2.practiceQuestionId())
@@ -105,7 +105,7 @@ public class FlowIntegrationTest {
 
         // Ho so ky nang duoc cap nhat cho cau dung (q1)
         List<LearnerSkillProfile> profiles = profileRepo.findByUserIdAndLicenseClassAndBankVersionAndTaxonomyVersion(
-                testUserId, licenseClass, "2025.1", "tax-v1.0");
+                testUserId, licenseClass, "dts-2026-600-v1", "tax-v1.0");
         Assertions.assertFalse(profiles.isEmpty(), "Ho so ky nang phai duoc tao/cap nhat");
         LearnerSkillProfile p1 = profiles.stream()
                 .filter(p -> p.getSkillCode().equals(q1.skillCode()))
@@ -126,7 +126,7 @@ public class FlowIntegrationTest {
 
         // Kiem tra profile truoc khi skip
         int profileCountBefore = profileRepo.findByUserIdAndLicenseClassAndBankVersionAndTaxonomyVersion(
-                testUserId, licenseClass, "2025.1", "tax-v1.0").size();
+                testUserId, licenseClass, "dts-2026-600-v1", "tax-v1.0").size();
 
         // Goi skipPlan
         var skipResponse = planService.skipPlan(testUserId, planId);
@@ -138,7 +138,7 @@ public class FlowIntegrationTest {
 
         // Ho so ky nang giu nguyen
         int profileCountAfter = profileRepo.findByUserIdAndLicenseClassAndBankVersionAndTaxonomyVersion(
-                testUserId, licenseClass, "2025.1", "tax-v1.0").size();
+                testUserId, licenseClass, "dts-2026-600-v1", "tax-v1.0").size();
         Assertions.assertEquals(profileCountBefore, profileCountAfter, "Ho so ky nang khong duoc bi thay doi hay tao rac khi skip");
     }
 }

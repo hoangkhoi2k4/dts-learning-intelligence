@@ -21,6 +21,7 @@ public class LearningEventDto {
     private String activityType;
     private UUID sessionId;
     private Integer practiceQuestionId;
+    private UUID contentBuilderQuestionId;
     private String outcome; // CORRECT, INCORRECT, UNANSWERED
     private OffsetDateTime occurredAt;
 }

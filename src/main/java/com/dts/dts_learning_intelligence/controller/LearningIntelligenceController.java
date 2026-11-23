@@ -1,5 +1,6 @@
 package com.dts.dts_learning_intelligence.controller;
 
+import com.dts.dts_learning_intelligence.dto.ExamAttemptSubmittedEventDto;
 import com.dts.dts_learning_intelligence.dto.LearningEventDto;
 import com.dts.dts_learning_intelligence.repository.LearnerSkillProfileRepository;
 import com.dts.dts_learning_intelligence.service.AdaptiveRecommendationService;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -23,13 +25,16 @@ public class LearningIntelligenceController {
     private final AdaptiveRecommendationService recommendationService;
     private final EvidenceIngestionAndProfilingService ingestionService;
 
+    private static final String DEFAULT_BANK_VERSION = "dts-2026-600-v1";
+    private static final String DEFAULT_TAXONOMY_VERSION = "tax-v1.0";
+
     // 1. Xem hồ sơ năng lực theo kỹ năng (Mục 10.2)
     @GetMapping("/me/profile")
     public ResponseEntity<?> getMyProfile(
             @RequestHeader("X-User-Id") UUID userId,
             @RequestParam(defaultValue = "B") String licenseClass) {
         var profiles = profileRepo.findByUserIdAndLicenseClassAndBankVersionAndTaxonomyVersion(
-                userId, licenseClass, "2025.1", "tax-v1.0");
+                userId, licenseClass, DEFAULT_BANK_VERSION, DEFAULT_TAXONOMY_VERSION);
         return ResponseEntity.ok(Map.of(
                 "userId", userId,
                 "licenseClass", licenseClass,
@@ -44,7 +49,7 @@ public class LearningIntelligenceController {
             @RequestHeader("X-User-Id") UUID userId,
             @RequestParam(defaultValue = "B") String licenseClass,
             @RequestParam(defaultValue = "5") int limit) {
-        var items = recommendationService.selectTopQuestions(userId, licenseClass, "2025.1", "tax-v1.0", limit);
+        var items = recommendationService.selectTopQuestions(userId, licenseClass, DEFAULT_BANK_VERSION, DEFAULT_TAXONOMY_VERSION, limit);
         return ResponseEntity.ok(Map.of("licenseClass", licenseClass, "items", items));
     }
 
@@ -73,7 +78,7 @@ public class LearningIntelligenceController {
             @RequestHeader("X-User-Id") UUID userId,
             @RequestParam(defaultValue = "B") String licenseClass) {
         var allProfiles = profileRepo.findByUserIdAndLicenseClassAndBankVersionAndTaxonomyVersion(
-                userId, licenseClass, "2025.1", "tax-v1.0");
+                userId, licenseClass, DEFAULT_BANK_VERSION, DEFAULT_TAXONOMY_VERSION);
         OffsetDateTime now = OffsetDateTime.now();
         var dueList = allProfiles.stream()
                 .filter(p -> p.getNextReviewAt() != null && !p.getNextReviewAt().isAfter(now))
@@ -86,6 +91,37 @@ public class LearningIntelligenceController {
     public ResponseEntity<?> ingestMockEvent(@RequestBody LearningEventDto event) {
         ingestionService.processLearningEvent(event);
         return ResponseEntity.ok(Map.of("status", "PROCESSED", "eventId", event.getEventId()));
+    }
+
+    @PostMapping("/internal/mock/batch-events")
+    public ResponseEntity<?> ingestMockBatchEvent(@RequestBody ExamAttemptSubmittedEventDto batchEvent) {
+        if (batchEvent.getItems() != null) {
+            for (var item : batchEvent.getItems()) {
+                UUID itemEventId = UUID.nameUUIDFromBytes(item.getSourceOutcomeKey().getBytes(StandardCharsets.UTF_8));
+                java.time.Instant occurredInstant = item.getAnsweredAt() != null ? item.getAnsweredAt() : batchEvent.getOccurredAt();
+                java.time.OffsetDateTime occurredAt = occurredInstant != null ? occurredInstant.atOffset(java.time.ZoneOffset.UTC) : null;
+
+                LearningEventDto singleEvent = LearningEventDto.builder()
+                        .eventId(itemEventId)
+                        .sourceOutcomeKey(item.getSourceOutcomeKey())
+                        .userId(batchEvent.getUserId())
+                        .licenseClass(batchEvent.getLicenseClass())
+                        .bankVersion(batchEvent.getBankVersion())
+                        .activityType(batchEvent.getActivityType())
+                        .sessionId(batchEvent.getSessionId())
+                        .practiceQuestionId(item.getPracticeQuestionId())
+                        .contentBuilderQuestionId(item.getContentBuilderQuestionId())
+                        .outcome(item.getOutcome())
+                        .occurredAt(occurredAt)
+                        .build();
+                ingestionService.processLearningEvent(singleEvent);
+            }
+        }
+        return ResponseEntity.ok(Map.of(
+                "status", "BATCH_PROCESSED",
+                "sessionId", batchEvent.getSessionId(),
+                "processedCount", batchEvent.getItems() != null ? batchEvent.getItems().size() : 0
+        ));
     }
 
     @PostMapping("/me/plans/{planId}/skip")

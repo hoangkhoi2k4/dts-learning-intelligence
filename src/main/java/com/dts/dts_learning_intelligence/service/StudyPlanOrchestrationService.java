@@ -22,7 +22,7 @@ public class StudyPlanOrchestrationService {
     private final AdaptiveSessionSnapshotRepository snapshotRepo;
     private final PracticeSessionClient practiceClient;
 
-    private static final String DEFAULT_BANK_VERSION = "2025.1";
+    private static final String DEFAULT_BANK_VERSION = "dts-2026-600-v1";
     private static final String DEFAULT_TAXONOMY_VERSION = "tax-v1.0";
 
     // Tạo đề xuất kế hoạch học (Bước 3 trong luồng nghiệp vụ 4.1)
