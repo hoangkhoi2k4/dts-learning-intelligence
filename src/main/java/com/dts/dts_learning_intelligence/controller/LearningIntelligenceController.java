@@ -3,6 +3,7 @@ package com.dts.dts_learning_intelligence.controller;
 import com.dts.dts_learning_intelligence.dto.ExamAttemptSubmittedEventDto;
 import com.dts.dts_learning_intelligence.dto.LearningEventDto;
 import com.dts.dts_learning_intelligence.repository.LearnerSkillProfileRepository;
+import com.dts.dts_learning_intelligence.repository.SkillTaxonomyRepository;
 import com.dts.dts_learning_intelligence.service.AdaptiveRecommendationService;
 import com.dts.dts_learning_intelligence.service.EvidenceIngestionAndProfilingService;
 import com.dts.dts_learning_intelligence.service.StudyPlanOrchestrationService;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -21,6 +23,7 @@ import java.util.UUID;
 public class LearningIntelligenceController {
 
     private final LearnerSkillProfileRepository profileRepo;
+    private final SkillTaxonomyRepository taxonomyRepo;
     private final StudyPlanOrchestrationService planService;
     private final AdaptiveRecommendationService recommendationService;
     private final EvidenceIngestionAndProfilingService ingestionService;
@@ -33,13 +36,55 @@ public class LearningIntelligenceController {
     public ResponseEntity<?> getMyProfile(
             @RequestHeader("X-User-Id") UUID userId,
             @RequestParam(defaultValue = "B") String licenseClass) {
-        var profiles = profileRepo.findByUserIdAndLicenseClassAndBankVersionAndTaxonomyVersion(
+        var existingProfiles = profileRepo.findByUserIdAndLicenseClassAndBankVersionAndTaxonomyVersion(
                 userId, licenseClass, DEFAULT_BANK_VERSION, DEFAULT_TAXONOMY_VERSION);
+        
+        Map<String, com.dts.dts_learning_intelligence.entity.LearnerSkillProfile> profileMap = existingProfiles.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        com.dts.dts_learning_intelligence.entity.LearnerSkillProfile::getSkillCode,
+                        p -> p,
+                        (p1, p2) -> p1
+                ));
+
+        // Lấy danh mục 14 kỹ năng đã ban hành
+        var publishedTaxonomies = taxonomyRepo.findByTaxonomyVersionAndStatus(DEFAULT_TAXONOMY_VERSION, "PUBLISHED");
+        if (publishedTaxonomies.isEmpty()) {
+            publishedTaxonomies = taxonomyRepo.findByTaxonomyVersion(DEFAULT_TAXONOMY_VERSION);
+        }
+
+        // Tạo danh sách đầy đủ các kỹ năng (nếu chưa có thì bổ sung profile ảo mặc định INSUFFICIENT_DATA)
+        List<com.dts.dts_learning_intelligence.entity.LearnerSkillProfile> fullProfiles = new java.util.ArrayList<>();
+        for (var tax : publishedTaxonomies) {
+            var profile = profileMap.get(tax.getSkillCode());
+            if (profile != null) {
+                fullProfiles.add(profile);
+            } else {
+                fullProfiles.add(com.dts.dts_learning_intelligence.entity.LearnerSkillProfile.builder()
+                        .userId(userId)
+                        .licenseClass(licenseClass)
+                        .bankVersion(DEFAULT_BANK_VERSION)
+                        .taxonomyVersion(DEFAULT_TAXONOMY_VERSION)
+                        .skillCode(tax.getSkillCode())
+                        .masteryScore(new java.math.BigDecimal("0.5000"))
+                        .distinctQuestionsCount(0)
+                        .distinctSessionsCount(0)
+                        .totalAttemptsCount(0)
+                        .correctAttemptsCount(0)
+                        .proficiencyStatus("INSUFFICIENT_DATA")
+                        .confidenceScore(new java.math.BigDecimal("0.0000"))
+                        .reviewIntervalDays(1)
+                        .consecutiveCorrectReviews(0)
+                        .algorithmVersion("bayes-v1.0")
+                        .explanationReason("Chưa có dữ liệu làm bài cho kỹ năng này.")
+                        .build());
+            }
+        }
+
         return ResponseEntity.ok(Map.of(
                 "userId", userId,
                 "licenseClass", licenseClass,
-                "overallStatus", profiles.isEmpty() ? "INSUFFICIENT_DATA" : "ACTIVE",
-                "skills", profiles
+                "overallStatus", existingProfiles.isEmpty() ? "INSUFFICIENT_DATA" : "ACTIVE",
+                "skills", fullProfiles
         ));
     }
 

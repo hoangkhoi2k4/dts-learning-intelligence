@@ -141,4 +141,28 @@ public class FlowIntegrationTest {
                 testUserId, licenseClass, "dts-2026-600-v1", "tax-v1.0").size();
         Assertions.assertEquals(profileCountBefore, profileCountAfter, "Ho so ky nang khong duoc bi thay doi hay tao rac khi skip");
     }
+
+    @Autowired
+    private com.dts.dts_learning_intelligence.controller.LearningIntelligenceController controller;
+
+    @Test
+    void testGetMyProfileReturnsAll14Skills() {
+        UUID newUserId = UUID.randomUUID();
+        String licenseClass = "B";
+
+        var response = (java.util.Map<?, ?>) controller.getMyProfile(newUserId, licenseClass).getBody();
+        Assertions.assertNotNull(response);
+        Assertions.assertEquals("INSUFFICIENT_DATA", response.get("overallStatus"));
+
+        @SuppressWarnings("unchecked")
+        List<LearnerSkillProfile> skills = (List<LearnerSkillProfile>) response.get("skills");
+        Assertions.assertNotNull(skills);
+        Assertions.assertEquals(14, skills.size(), "API phai tra ve du 14 ky nang");
+
+        // Tat ca cac ky nang cua nguoi moi tinh phai co trang thai INSUFFICIENT_DATA va masteryScore = 0.5
+        for (LearnerSkillProfile skill : skills) {
+            Assertions.assertEquals("INSUFFICIENT_DATA", skill.getProficiencyStatus());
+            Assertions.assertEquals(new BigDecimal("0.5000"), skill.getMasteryScore());
+        }
+    }
 }
