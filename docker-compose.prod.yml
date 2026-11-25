@@ -1,0 +1,30 @@
+services:
+  dts-learning-intelligence:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dts-learning-intelligence
+    restart: unless-stopped
+    ports:
+      - "8091:8091"
+    environment:
+      - SERVER_PORT=8091
+      - DB_HOST=103.20.96.85
+      - DB_PORT=5434
+      - DB_NAME=dts_learning_intelligence
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=K59Ptl*100504
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - DTS_KAFKA_ENABLED=true
+      - DTS_KAFKA_TOPICS_LEARNING_PROGRESS=dts.practice.learning-progress.v1
+      - DTS_PRACTICE_MOCK_ENABLED=true
+      - DTS_PRACTICE_BASE_URL=http://dts-practice:8082
+    mem_limit: 400m
+    extra_hosts:
+      - "kafka:103.20.96.85"
+    networks:
+      - dts-network
+
+networks:
+  dts-network:
+    external: true
