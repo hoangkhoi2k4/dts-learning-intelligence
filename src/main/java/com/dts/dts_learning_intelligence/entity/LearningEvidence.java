@@ -52,11 +52,26 @@ public class LearningEvidence {
     @Column(name = "session_id")
     private UUID sessionId;
 
-    @Column(name = "practice_question_id", nullable = false)
+    @Column(name = "practice_question_id")
     private Integer practiceQuestionId;
 
     @Column(name = "content_builder_question_id")
     private UUID contentBuilderQuestionId;
+
+    @Column(name = "scenario_id")
+    private UUID scenarioId;
+
+    @Column(name = "scenario_number")
+    private Integer scenarioNumber;
+
+    @Column(name = "score")
+    private Integer score;
+
+    @Column(name = "first_response_ms")
+    private Integer firstResponseMs;
+
+    @Column(name = "earned_score", precision = 5, scale = 4)
+    private BigDecimal earnedScore;
 
     @Column(name = "outcome", length = 20, nullable = false)
     private String outcome;

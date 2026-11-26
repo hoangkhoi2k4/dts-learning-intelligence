@@ -57,6 +57,11 @@ public class LearningEventKafkaConsumer {
                         .sessionId(batchEvent.getSessionId())
                         .practiceQuestionId(item.getPracticeQuestionId())
                         .contentBuilderQuestionId(item.getContentBuilderQuestionId())
+                        .scenarioId(item.getScenarioId())
+                        .scenarioNumber(item.getScenarioNumber())
+                        .score(item.getScore())
+                        .firstResponseMs(item.getFirstResponseMs())
+                        .durationMs(item.getDurationMs())
                         .outcome(item.getOutcome())
                         .occurredAt(occurredAt)
                         .build();

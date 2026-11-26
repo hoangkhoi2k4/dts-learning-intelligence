@@ -29,13 +29,23 @@ public class ExamAttemptSubmittedEventDto {
     @AllArgsConstructor
     public static class ItemDto {
         private String sourceOutcomeKey;
+    
         private Integer practiceQuestionId;
         private Integer sourceQuestionId;
         private UUID contentBuilderQuestionId;
-        private Integer chapterId;
         private Boolean critical;
-        private String outcome; // CORRECT, INCORRECT, UNANSWERED
-        private Instant answeredAt;
         private String evidenceIdentityStatus;
+        
+        // Mô phỏng (0..5 điểm)
+        private UUID scenarioId;
+        private Integer scenarioNumber;
+        private Integer score;           // Thang điểm 0..5
+        private Integer firstResponseMs; // Thời điểm bấm phím Space (ms)
+        private Integer durationMs;      // Tổng thời lượng video (ms)
+
+        // Trường dùng chung
+        private Integer chapterId;
+        private String outcome;          // CORRECT, INCORRECT, UNANSWERED
+        private Instant answeredAt;
     }
 }

@@ -156,6 +156,11 @@ public class LearningIntelligenceController {
                         .sessionId(batchEvent.getSessionId())
                         .practiceQuestionId(item.getPracticeQuestionId())
                         .contentBuilderQuestionId(item.getContentBuilderQuestionId())
+                        .scenarioId(item.getScenarioId())
+                        .scenarioNumber(item.getScenarioNumber())
+                        .score(item.getScore())
+                        .firstResponseMs(item.getFirstResponseMs())
+                        .durationMs(item.getDurationMs())
                         .outcome(item.getOutcome())
                         .occurredAt(occurredAt)
                         .build();
@@ -176,5 +181,28 @@ public class LearningIntelligenceController {
         return ResponseEntity.ok(planService.skipPlan(userId, planId));
     }
 
+    // 7. Tạo danh sách phát tình huống mô phỏng rèn luyện các điểm yếu nhất
+    @PostMapping("/me/simulation-playlists")
+    public ResponseEntity<?> createSimulationPlaylist(
+            @RequestHeader("X-User-Id") UUID userId,
+            @RequestBody(required = false) CreateSimulationPlaylistRequest req) {
+        String license = (req != null && req.licenseClass() != null) ? req.licenseClass() : "B";
+        int limit = (req != null && req.limit() != null && req.limit() > 0) ? req.limit() : 10;
+        String bankVersion = (req != null && req.bankVersion() != null && !req.bankVersion().isBlank()) 
+                ? req.bankVersion() : DEFAULT_BANK_VERSION;
+
+        var items = recommendationService.selectWeakestScenarios(
+                userId, license, bankVersion, DEFAULT_TAXONOMY_VERSION, limit);
+
+        return ResponseEntity.ok(Map.of(
+                "userId", userId,
+                "licenseClass", license,
+                "bankVersion", bankVersion,
+                "playlistSize", items.size(),
+                "items", items
+        ));
+    }
+
     public record CreatePlanRequest(String licenseClass, Integer targetQuestionCount) {}
+    public record CreateSimulationPlaylistRequest(String licenseClass, Integer limit, String bankVersion) {}
 }

@@ -2,9 +2,11 @@ package com.dts.dts_learning_intelligence.service;
 
 import com.dts.dts_learning_intelligence.entity.LearnerSkillProfile;
 import com.dts.dts_learning_intelligence.entity.QuestionSkillMapping;
+import com.dts.dts_learning_intelligence.entity.SimulationSkillMapping;
 import com.dts.dts_learning_intelligence.repository.LearnerSkillProfileRepository;
 import com.dts.dts_learning_intelligence.repository.LearningEvidenceRepository;
 import com.dts.dts_learning_intelligence.repository.QuestionSkillMappingRepository;
+import com.dts.dts_learning_intelligence.repository.SimulationSkillMappingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 public class AdaptiveRecommendationService {
 
     private final QuestionSkillMappingRepository mappingRepo;
+    private final SimulationSkillMappingRepository simMappingRepo;
     private final LearnerSkillProfileRepository profileRepo;
     private final LearningEvidenceRepository evidenceRepo;
 
@@ -151,6 +154,150 @@ public class AdaptiveRecommendationService {
         }
         return "Câu hỏi tổng hợp giúp duy trì sự đa dạng kiến thức.";
     }
+
+    public List<RecommendedScenarioItem> selectWeakestScenarios(UUID userId, String licenseClass,
+                                                                String bankVersion, String taxonomyVersion,
+                                                                int limit) {
+        // 1. Lấy tất cả mapping tình huống mô phỏng hợp lệ
+        List<SimulationSkillMapping> allScenarios = simMappingRepo
+                .findByBankVersionAndTaxonomyVersionAndStatus(bankVersion, taxonomyVersion, "PUBLISHED");
+
+        // Fallback: nếu theo bankVersion truyền vào rỗng, tìm theo bankVersion mặc định dts-2026-600-v1 hoặc bất kỳ bản ghi PUBLISHED
+        if (allScenarios.isEmpty()) {
+            allScenarios = simMappingRepo.findAll().stream()
+                    .filter(s -> "PUBLISHED".equalsIgnoreCase(s.getStatus()))
+                    .toList();
+        }
+
+        // Lấy hồ sơ kỹ năng của user
+        Map<String, LearnerSkillProfile> profileMap = profileRepo
+                .findByUserIdAndLicenseClassAndBankVersionAndTaxonomyVersion(
+                        userId, licenseClass, bankVersion, taxonomyVersion)
+                .stream()
+                .collect(Collectors.toMap(LearnerSkillProfile::getSkillCode, Function.identity()));
+
+        // Lấy lịch sử làm mô phỏng của user: scenarioNumber -> {lastAttemptedAt, avgScore}
+        Map<Integer, OffsetDateTime> lastAttemptedMap = new HashMap<>();
+        Map<Integer, Double> avgScoreMap = new HashMap<>();
+
+        List<Object[]> rawStats = evidenceRepo.findRawSimulationStatsPerScenario(userId, licenseClass);
+        for (Object[] row : rawStats) {
+            if (row[0] != null) {
+                Integer sNum = ((Number) row[0]).intValue();
+                if (row[1] != null) {
+                    OffsetDateTime odt;
+                    if (row[1] instanceof OffsetDateTime o) {
+                        odt = o;
+                    } else if (row[1] instanceof Timestamp ts) {
+                        odt = ts.toInstant().atOffset(OffsetDateTime.now().getOffset());
+                    } else {
+                        odt = OffsetDateTime.parse(row[1].toString());
+                    }
+                    lastAttemptedMap.put(sNum, odt);
+                }
+                if (row[2] != null) {
+                    avgScoreMap.put(sNum, ((Number) row[2]).doubleValue());
+                }
+            }
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        List<ScoredScenario> scoredList = new ArrayList<>();
+
+        for (SimulationSkillMapping sim : allScenarios) {
+            LearnerSkillProfile profile = profileMap.get(sim.getPrimarySkillCode());
+
+            // 1. W(sim): Nhu cầu củng cố theo kỹ năng (0.0 -> 1.0)
+            double mHat = (profile != null) ? profile.getMasteryScore().doubleValue() : 0.5;
+            double skillWeaknessScore = 1.0 - mHat;
+
+            // 2. Điểm yếu cụ thể của chính tình huống này nếu đã từng làm
+            Double personalAvg = avgScoreMap.get(sim.getScenarioNumber());
+            double directWeaknessScore;
+            String reason;
+
+            if (personalAvg != null) {
+                // Điểm trung bình càng thấp -> độ yếu càng cao
+                directWeaknessScore = 1.0 - personalAvg;
+                if (personalAvg < 0.6) {
+                    reason = String.format("Tình huống đã làm điểm thấp (trung bình %.1f/5 điểm) — cần ưu tiên rèn luyện lại phản xạ.", personalAvg * 5.0);
+                } else {
+                    reason = "Tình huống thuộc nhóm kỹ năng đang cần củng cố để duy trì phản xạ an toàn.";
+                }
+            } else {
+                directWeaknessScore = 0.5; // Chưa làm
+                if (profile != null && "NEEDS_REINFORCEMENT".equals(profile.getProficiencyStatus())) {
+                    reason = "Tình huống mới thuộc nhóm kỹ năng còn yếu để kiểm tra phản xạ tình huống.";
+                } else {
+                    reason = "Tình huống khám phá phản xạ theo tiêu chuẩn sát hạch.";
+                }
+            }
+
+            // 3. Đến hạn ôn giãn cách
+            double dScore = (profile != null && profile.getNextReviewAt() != null && !profile.getNextReviewAt().isAfter(now))
+                    ? 1.0 : 0.0;
+
+            // 4. Tổng hợp độ ưu tiên (Weakness trực tiếp chiếm trọng số lớn)
+            double priority = (0.45 * directWeaknessScore)
+                            + (0.35 * skillWeaknessScore)
+                            + (0.20 * dScore);
+
+            scoredList.add(new ScoredScenario(sim, priority, reason));
+        }
+
+        // Chọn các tình huống yếu nhất và đa dạng hóa theo chương
+        scoredList.sort((a, b) -> Double.compare(b.priority, a.priority));
+
+        List<RecommendedScenarioItem> playlist = new ArrayList<>();
+        Map<Integer, Integer> chapterPickedCount = new HashMap<>();
+
+        for (ScoredScenario item : scoredList) {
+            if (playlist.size() >= limit) break;
+
+            int chCount = chapterPickedCount.getOrDefault(item.mapping.getChapterId(), 0);
+            // Giới hạn không chọn quá 3 tình huống trong cùng 1 chương nếu còn đủ chỗ
+            if (chCount >= 3 && scoredList.size() > limit * 2) {
+                continue;
+            }
+
+            chapterPickedCount.put(item.mapping.getChapterId(), chCount + 1);
+            playlist.add(new RecommendedScenarioItem(
+                    item.mapping.getScenarioId(),
+                    item.mapping.getScenarioNumber(),
+                    item.mapping.getChapterId(),
+                    item.mapping.getTitle(),
+                    item.mapping.getPrimarySkillCode(),
+                    item.priority,
+                    item.reason
+            ));
+        }
+
+        // Nếu vì điều kiện giới hạn chương mà chưa đủ số lượng limit, lấp đầy bằng các tình huống còn lại
+        if (playlist.size() < limit) {
+            for (ScoredScenario item : scoredList) {
+                if (playlist.size() >= limit) break;
+                boolean alreadyIn = playlist.stream()
+                        .anyMatch(p -> Objects.equals(p.scenarioNumber(), item.mapping.getScenarioNumber()));
+                if (!alreadyIn) {
+                    playlist.add(new RecommendedScenarioItem(
+                            item.mapping.getScenarioId(),
+                            item.mapping.getScenarioNumber(),
+                            item.mapping.getChapterId(),
+                            item.mapping.getTitle(),
+                            item.mapping.getPrimarySkillCode(),
+                            item.priority,
+                            item.reason
+                    ));
+                }
+            }
+        }
+
+        return playlist;
+    }
+
+    private record ScoredScenario(SimulationSkillMapping mapping, double priority, String reason) {}
+    public record RecommendedScenarioItem(UUID scenarioId, Integer scenarioNumber, Integer chapterId,
+                                          String title, String skillCode, double priorityScore, String reason) {}
 
     private record ScoredQuestion(QuestionSkillMapping mapping, double baseScore, String reason) {}
     public record RecommendedQuestionItem(Integer practiceQuestionId, UUID contentBuilderQuestionId,
