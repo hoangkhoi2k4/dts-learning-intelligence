@@ -27,4 +27,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(Map.of("error", "FORBIDDEN", "message", ex.getMessage()));
     }
+
+    @ExceptionHandler(com.dts.dts_learning_intelligence.rag.exception.RateLimitExceededException.class)
+    public ResponseEntity<?> handleRateLimitExceeded(com.dts.dts_learning_intelligence.rag.exception.RateLimitExceededException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(Map.of("error", "RATE_LIMIT_EXCEEDED", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(com.dts.dts_learning_intelligence.rag.exception.DailyQuotaExceededException.class)
+    public ResponseEntity<?> handleDailyQuotaExceeded(com.dts.dts_learning_intelligence.rag.exception.DailyQuotaExceededException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(Map.of("error", "DAILY_QUOTA_EXCEEDED", "message", ex.getMessage()));
+    }
 }

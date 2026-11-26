@@ -37,4 +37,14 @@ public interface QuestionSkillMappingRepository extends JpaRepository<QuestionSk
 
     Optional<QuestionSkillMapping> findByBankVersionAndPracticeQuestionIdAndStatus(
             String bankVersion, Integer practiceQuestionId, String status);
+
+    @Query("""
+            SELECT m FROM QuestionSkillMapping m
+            WHERE m.bankVersion = :bankVersion
+              AND (m.practiceQuestionId = :questionId OR m.sourceQuestionId = :questionId)
+              AND m.status = 'PUBLISHED'
+            """)
+    Optional<QuestionSkillMapping> findByBankVersionAndAnyQuestionId(
+            @Param("bankVersion") String bankVersion,
+            @Param("questionId") Integer questionId);
 }

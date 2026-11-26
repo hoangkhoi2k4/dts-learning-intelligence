@@ -16,12 +16,16 @@ import java.util.UUID;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 @ConditionalOnProperty(name = "dts.kafka.enabled", havingValue = "true")
 public class LearningEventKafkaConsumer {
 
     private final EvidenceIngestionAndProfilingService ingestionService;
     private final ObjectMapper objectMapper;
+
+    public LearningEventKafkaConsumer(EvidenceIngestionAndProfilingService ingestionService, ObjectMapper objectMapper) {
+        this.ingestionService = ingestionService;
+        this.objectMapper = objectMapper != null ? objectMapper.copy().findAndRegisterModules() : new ObjectMapper().findAndRegisterModules();
+    }
 
     @KafkaListener(
             topics = "${dts.kafka.topics.learning-progress}",

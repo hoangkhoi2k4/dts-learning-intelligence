@@ -1,5 +1,6 @@
 package com.dts.dts_learning_intelligence.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,6 +12,7 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ExamAttemptSubmittedEventDto {
     private UUID eventId;
     private String eventType;
@@ -27,6 +29,7 @@ public class ExamAttemptSubmittedEventDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ItemDto {
         private String sourceOutcomeKey;
     

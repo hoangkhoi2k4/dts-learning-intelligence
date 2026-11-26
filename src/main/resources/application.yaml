@@ -6,9 +6,9 @@ spring:
     name: dts-learning-intelligence
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:dts_learning_intelligence} # Đổi thành tên DB chứa 6 bảng của bạn
+    url: jdbc:postgresql://${DB_HOST:103.20.96.85}:${DB_PORT:5434}/${DB_NAME:dts_learning_intelligence}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:khoi0000}
+    password: ${DB_PASSWORD:K59Ptl*100504}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -36,3 +36,15 @@ dts:
     enabled: false # Để false khi dev local không bật Kafka; bật true khi ghép hệ thống thật
     topics:
       learning-progress: dts.practice.learning-progress.v1
+  rag:
+    enabled: ${RAG_ENABLED:true}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-flash-lite-latest}
+      embedding-model: ${GEMINI_EMBEDDING_MODEL:text-embedding-004}
+    token-limits:
+      max-query-characters: ${RAG_MAX_QUERY_CHARS:500}
+      max-output-tokens: ${RAG_MAX_OUTPUT_TOKENS:600}
+      rate-limit-per-minute: ${RAG_RATE_LIMIT_PER_MINUTE:5}
+      daily-max-queries: ${RAG_DAILY_MAX_QUERIES:30}
+      daily-max-tokens: ${RAG_DAILY_MAX_TOKENS:40000}

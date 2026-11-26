@@ -15,7 +15,7 @@ public class DtsLearningIntelligenceApplication {
 	@Bean
 	public ObjectMapper objectMapper() {
 		ObjectMapper mapper = new ObjectMapper();
-		mapper.findAndRegisterModules();
+		mapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 		return mapper;
 	}
 

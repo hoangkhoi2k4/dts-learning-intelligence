@@ -1,0 +1,281 @@
+================================================================================
+          TAI LIEU HOP DONG TICH HOP FRONTEND & BO LENH CURL DTS RAG AI
+================================================================================
+
+* Remote Host: http://103.20.96.85:8091
+* Microservice: dts-learning-intelligence (RAG AI Knowledge Assistant)
+* Dinh dang du lieu: application/json (Encoding: UTF-8)
+* Ngay cap nhat: 26/11/2026
+
+--------------------------------------------------------------------------------
+1. CHUAN HEADER BAT BUOC (Moi request deu phai co)
+--------------------------------------------------------------------------------
+- Content-Type: application/json
+- X-User-Id: <UUID_CUA_HOC_VIEN>
+  (Vi du: a0fb5f50-826d-4ea4-8b33-ca5d6fa6b639)
+  * Luu y: Bat buoc phai truyen X-User-Id de he thong quan ly han muc 30 cau/ngay
+    va chong spam 5 cau/phut cho tung tai khoan.
+
+--------------------------------------------------------------------------------
+2. DANH MUC LENH CURL HOAN CHINH (TEST TRUC TIEP)
+--------------------------------------------------------------------------------
+
+[CASE 1]: HOI VE CAU HOI DANG LAM SAI TRONG DE THI (THEORY_QUESTION)
+--------------------------------------------------------------------------------
+* Mo ta: Khi hoc vien bam "Hoi tro ly AI" tai cau so 15. He thong tu dong tra ve
+  thong tin cau 15 (questionDetail) va Gemini giai thich ly do chon sai.
+
+-- Lenh cURL (Linux / Mac / VPS Bash / Git Bash):
+curl -X POST "http://103.20.96.85:8091/api/learning-intelligence/v1/rag/chat" \
+  -H "Content-Type: application/json" \
+  -H "X-User-Id: a0fb5f50-826d-4ea4-8b33-ca5d6fa6b639" \
+  -d '{
+    "message": "Tại sao câu hỏi này tôi lại chọn sai?",
+    "contextType": "THEORY_QUESTION",
+    "contextRefId": "15",
+    "licenseClass": "B"
+  }'
+
+-- Lenh cURL (Windows PowerShell):
+curl.exe -X POST "http://103.20.96.85:8091/api/learning-intelligence/v1/rag/chat" `
+  -H "Content-Type: application/json" `
+  -H "X-User-Id: a0fb5f50-826d-4ea4-8b33-ca5d6fa6b639" `
+  -d '{\"message\": \"Tại sao câu hỏi này tôi lại chọn sai?\", \"contextType\": \"THEORY_QUESTION\", \"contextRefId\": \"15\", \"licenseClass\": \"B\"}'
+
+
+[CASE 2]: HOI VE MOT KY NANG CU THE (THEORY_SKILL)
+--------------------------------------------------------------------------------
+* Mo ta: Khi hoc vien dang o man hinh Cay ky nang va muon nghe giang ve mot chu de.
+
+-- Lenh cURL (Linux / Mac / VPS Bash / Git Bash):
+curl -X POST "http://103.20.96.85:8091/api/learning-intelligence/v1/rag/chat" \
+  -H "Content-Type: application/json" \
+  -H "X-User-Id: a0fb5f50-826d-4ea4-8b33-ca5d6fa6b639" \
+  -d '{
+    "message": "Giải thích quy tắc nhường đường tại nơi giao nhau",
+    "contextType": "THEORY_SKILL",
+    "contextRefId": "RULE_RIGHT_OF_WAY",
+    "licenseClass": "B"
+  }'
+
+-- Cac ma ky nang hop le truyen vao contextRefId:
+  + RULE_RIGHT_OF_WAY : Quy tac nhuong duong & Noi giao nhau
+  + RULE_PROHIBITED   : Cac hanh vi bi nghiem cam & Nong do con
+  + RULE_SPEED_DIST   : Quy dinh toc do & Khoang cach an toan
+  + RULE_CONCEPT      : Khai niem & Thuat ngu giao thong
+  + SIGN_PROHIBIT     : Bien bao cam
+  + SIGN_WARNING      : Bien bao nguy hiem
+  + SIM_INTERSECTION  : Sa hinh: Thu tu xe di & Quyen uu tien
+
+
+[CASE 3]: HOI DAP LUAT TU DO (GENERAL)
+--------------------------------------------------------------------------------
+* Mo ta: Khung chat doc lap o trang chu, hoc vien hoi bat ky ve luat hay muc phat.
+
+-- Lenh cURL (Linux / Mac / VPS Bash / Git Bash):
+curl -X POST "http://103.20.96.85:8091/api/learning-intelligence/v1/rag/chat" \
+  -H "Content-Type: application/json" \
+  -H "X-User-Id: a0fb5f50-826d-4ea4-8b33-ca5d6fa6b639" \
+  -d '{
+    "message": "Nồng độ cồn khi lái xe ô tô bị xử phạt thế nào?",
+    "contextType": "GENERAL",
+    "licenseClass": "B"
+  }'
+
+
+[CASE 4]: KIEM TRA HAN NGOACH & SO LUOT HOI CON LAI (GET QUOTA)
+--------------------------------------------------------------------------------
+* Mo ta: Goi khi hoc vien mo man hinh chat de hien badge "Con 30/30 luot hoi".
+
+-- Lenh cURL:
+curl -X GET "http://103.20.96.85:8091/api/learning-intelligence/v1/rag/quota" \
+  -H "X-User-Id: a0fb5f50-826d-4ea4-8b33-ca5d6fa6b639"
+
+-- Response mau (200 OK):
+{
+  "userId": "a0fb5f50-826d-4ea4-8b33-ca5d6fa6b639",
+  "remainingDailyQueries": 30,
+  "maxDailyQueries": 30,
+  "rateLimitPerMinute": 5
+}
+
+--------------------------------------------------------------------------------
+3. CAU TRUC DU LIEU JSON (JSON SCHEMAS)
+--------------------------------------------------------------------------------
+
+A. REQUEST BODY (POST /api/learning-intelligence/v1/rag/chat):
+{
+  "message": "Tại sao câu hỏi này tôi lại chọn sai?",    // [String, Bat buoc, toi da 500 ky tu]
+  "contextType": "THEORY_QUESTION",                     // [String, Tuy chon: THEORY_QUESTION | THEORY_SKILL | GENERAL]
+  "contextRefId": "15",                                 // [String, Tuy chon: ID cau hoi (vd: "15") hoac Ma ky nang]
+  "licenseClass": "B"                                   // [String, Tuy chon: "B", "C1", "A1"... mac dinh la "B"]
+}
+
+B. RESPONSE BODY (200 OK):
+{
+  "answer": "Chào học viên thân mến!...",               // [String] Cau tra loi Markdown cua Giang vien DTS
+  "sources": [                                          // [Array] Danh sach cac dieu luat can cu
+    {
+      "sourceId": "uuid-cua-dieu-luat",
+      "documentTitle": "Luật Trật tự an toàn giao thông đường bộ 2024",
+      "documentNumber": "36/2024/QH15",
+      "chapter": "CHƯƠNG I. NHỮNG QUY ĐỊNH CHUNG",
+      "article": "2",
+      "clause": "11",
+      "point": "",
+      "citation": "36/2024/QH15 - Điều 2 Khoản 11",
+      "snippet": "11. Dừng xe là trạng thái đứng yên tạm thời...",
+      "validityStatus": "VALID"
+    }
+  ],
+  "contextUsed": "THEORY_QUESTION",                     // [String] Ngay canh da ap dung
+  "remainingDailyQueries": 29,                          // [Integer] So cau hoi mien phi con lai trong ngay
+  "isFallback": false,                                  // [Boolean] false: AI tra loi; true: che do offline
+  "suggestedActions": [                                 // [Array<String>] Cac nut hanh dong goi y ben duoi
+    "Quay lại câu hỏi đang luyện",
+    "Xem bài ôn liên quan"
+  ],
+  "questionDetail": {                                   // [Object, Chi xuat hien khi contextType=THEORY_QUESTION]
+    "questionId": 15,                                   // ID trong he thong practice
+    "sourceQuestionId": 15,                             // So thu tu trong bo 600 cau
+    "chapter": 1,                                       // Chuong cau hoi
+    "questionText": "Đỗ xe được hiểu như thế nào là đúng?",
+    "options": [                                        // Danh sach cac phuong an lua chon
+      {
+        "label": "A",
+        "text": "Là trạng thái đứng yên của xe có giới hạn thời gian..."
+      },
+      {
+        "label": "B",
+        "text": "Là trạng thái đứng yên của xe không giới hạn thời gian..."
+      }
+    ],
+    "correctAnswer": "B",                               // Dap an dung
+    "isCritical": false,                                // true neu la cau diem liet
+    "explanation": "Đỗ xe là trạng thái đứng yên không giới hạn thời gian..."
+  }
+}
+
+--------------------------------------------------------------------------------
+4. TYPESCRIPT INTERFACES (DUNG CHO D-TS APP REACT NATIVE & WEB)
+--------------------------------------------------------------------------------
+
+export interface RAGChatRequest {
+  message: string;
+  contextType?: 'THEORY_QUESTION' | 'THEORY_SKILL' | 'SIMULATION_SCENARIO' | 'GENERAL';
+  contextRefId?: string;
+  licenseClass?: string;
+}
+
+export interface LegalSourceItem {
+  sourceId: string;
+  documentTitle: string;
+  documentNumber: string;
+  chapter: string;
+  article: string;
+  clause: string;
+  point?: string;
+  citation: string;
+  snippet: string;
+  validityStatus: 'VALID' | 'EXPIRED';
+}
+
+export interface QuestionOption {
+  label: string;
+  text: string;
+}
+
+export interface QuestionDetailItem {
+  questionId: number;
+  sourceQuestionId: number;
+  chapter: number;
+  questionText: string;
+  options: QuestionOption[];
+  correctAnswer: string;
+  isCritical: boolean;
+  explanation: string;
+  skillCode?: string;
+  skillName?: string;
+}
+
+export interface RAGChatResponse {
+  answer: string;
+  sources: LegalSourceItem[];
+  contextUsed: string;
+  remainingDailyQueries: number;
+  isFallback: boolean;
+  suggestedActions: string[];
+  questionDetail?: QuestionDetailItem;
+}
+
+export interface RAGQuotaResponse {
+  userId: string;
+  remainingDailyQueries: number;
+  maxDailyQueries: number;
+  rateLimitPerMinute: number;
+}
+
+--------------------------------------------------------------------------------
+5. MA NGUON HOOK MAU TICH HOP (React / React Native useRAGAssistant.ts)
+--------------------------------------------------------------------------------
+
+import { useState } from 'react';
+import axios from 'axios';
+
+const RAG_BASE_URL = 'http://103.20.96.85:8091/api/learning-intelligence/v1/rag';
+
+export const useRAGAssistant = (currentUserId: string) => {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [response, setResponse] = useState<RAGChatResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const askAssistant = async (
+    question: string,
+    contextType: 'THEORY_QUESTION' | 'THEORY_SKILL' | 'GENERAL' = 'GENERAL',
+    contextRefId?: string,
+    licenseClass: string = 'B'
+  ) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axios.post<RAGChatResponse>(
+        `${RAG_BASE_URL}/chat`,
+        {
+          message: question,
+          contextType,
+          contextRefId,
+          licenseClass,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-User-Id': currentUserId,
+          },
+        }
+      );
+      setResponse(res.data);
+      return res.data;
+    } catch (err: any) {
+      if (err.response?.status === 429) {
+        setError('Ban da gui qua nhanh (toi da 5 cau/phut) hoac da het han muc 30 cau/ngay!');
+      } else {
+        setError(err.response?.data?.message || 'Loi ket noi den Tro ly AI.');
+      }
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { askAssistant, response, loading, error };
+};
+
+--------------------------------------------------------------------------------
+6. MA LOI HTTP STATUS CAN BAT (ERROR HANDLING)
+--------------------------------------------------------------------------------
+- 200 OK: Thanh cong, hien thi cau tra loi + nguon luat + chi tiet cau hoi.
+- 400 Bad Request: Thieu header X-User-Id hoac cau hoi vuot qua 500 ky tu.
+- 429 Too Many Requests: Vuot qua 5 cau/phut hoac vuot qua 30 cau/ngay.
+  -> Frontend show popup/toast: "Ban da het 30 luot hoi mien phi hom nay. Vui long quay lai vao ngay mai!"
+- 500 Server Error: Loi may chu noi bo.
+================================================================================

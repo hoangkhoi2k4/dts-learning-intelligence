@@ -19,6 +19,8 @@ services:
       - DTS_KAFKA_TOPICS_LEARNING_PROGRESS=dts.practice.learning-progress.v1
       - DTS_PRACTICE_MOCK_ENABLED=true
       - DTS_PRACTICE_BASE_URL=http://dts-practice:8082
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-flash-lite-latest}
     mem_limit: 400m
     extra_hosts:
       - "kafka:103.20.96.85"
