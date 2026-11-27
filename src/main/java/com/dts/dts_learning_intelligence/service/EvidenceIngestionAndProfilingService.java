@@ -99,14 +99,29 @@ public class EvidenceIngestionAndProfilingService {
                 simMapping = simMappingRepo.findByBankVersionAndTaxonomyVersionAndScenarioNumber(
                         event.getBankVersion(), DEFAULT_TAXONOMY_VERSION, event.getScenarioNumber()).orElse(null);
             }
-
-            if (simMapping == null) {
-                log.warn("Không tìm thấy mapping mô phỏng cho scenarioNumber={}, scenarioId={}",
-                        event.getScenarioNumber(), event.getScenarioId());
-                return;
+            if (simMapping == null && event.getScenarioNumber() != null) {
+                // Thử tra cứu theo các phiên bản ngân hàng chuẩn
+                simMapping = simMappingRepo.findByBankVersionAndTaxonomyVersionAndScenarioNumber(
+                        "dts-simulation-120-video-v1", DEFAULT_TAXONOMY_VERSION, event.getScenarioNumber()).orElse(null);
+                if (simMapping == null) {
+                    simMapping = simMappingRepo.findByBankVersionAndTaxonomyVersionAndScenarioNumber(
+                            "dts-2026-600-v1", DEFAULT_TAXONOMY_VERSION, event.getScenarioNumber()).orElse(null);
+                }
             }
 
-            primarySkillCode = simMapping.getPrimarySkillCode();
+            if (simMapping == null) {
+                int num = event.getScenarioNumber() != null ? event.getScenarioNumber() : 1;
+                String fallbackSkill = num <= 29 ? "SIM_CH1_URBAN" :
+                                       num <= 43 ? "SIM_CH2_RURAL" :
+                                       num <= 63 ? "SIM_CH3_HIGHWAY" :
+                                       num <= 73 ? "SIM_CH4_MOUNTAIN" :
+                                       num <= 90 ? "SIM_CH5_NATIONAL" : "SIM_CH6_ACCIDENT";
+                primarySkillCode = fallbackSkill;
+                log.info("Sử dụng fallback skill {} cho tình huống mô phỏng số {}", fallbackSkill, num);
+            } else {
+                primarySkillCode = simMapping.getPrimarySkillCode();
+            }
+
             // Quy đổi thang điểm 0..5 về [0.0 .. 1.0]
             earnedScore = Math.max(0.0, Math.min(5.0, event.getScore())) / 5.0;
 
@@ -117,6 +132,9 @@ public class EvidenceIngestionAndProfilingService {
                 weight = Math.pow(0.5, currentAttemptNo - 1);
             }
 
+            UUID finalScenarioId = simMapping != null ? simMapping.getScenarioId() : event.getScenarioId();
+            Integer finalScenarioNumber = simMapping != null ? simMapping.getScenarioNumber() : event.getScenarioNumber();
+
             LearningEvidence evidence = LearningEvidence.builder()
                     .eventId(event.getEventId())
                     .sourceOutcomeKey(event.getSourceOutcomeKey())
@@ -125,8 +143,8 @@ public class EvidenceIngestionAndProfilingService {
                     .bankVersion(event.getBankVersion())
                     .activityType(event.getActivityType())
                     .sessionId(event.getSessionId())
-                    .scenarioId(simMapping.getScenarioId())
-                    .scenarioNumber(simMapping.getScenarioNumber())
+                    .scenarioId(finalScenarioId)
+                    .scenarioNumber(finalScenarioNumber)
                     .score(event.getScore())
                     .firstResponseMs(event.getFirstResponseMs())
                     .earnedScore(BigDecimal.valueOf(earnedScore))

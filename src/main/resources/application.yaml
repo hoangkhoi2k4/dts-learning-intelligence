@@ -21,7 +21,7 @@ spring:
         format_sql: true
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:103.20.96.85:9092}
     consumer:
       group-id: dts-learning-intelligence-group
       auto-offset-reset: earliest
@@ -33,7 +33,7 @@ dts:
     mock-enabled: true
     base-url: http://localhost:8082 # URL nội bộ của service dts-practice
   kafka:
-    enabled: false # Để false khi dev local không bật Kafka; bật true khi ghép hệ thống thật
+    enabled: ${DTS_KAFKA_ENABLED:true} # Mặc định bật để tự động nhận event từ topic
     topics:
       learning-progress: dts.practice.learning-progress.v1
   rag:
